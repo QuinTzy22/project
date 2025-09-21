@@ -1,0 +1,142 @@
+
+        // Initialize the map (using Leaflet.js or similar)
+       var map = L.map('map').setView([0, 0], 2); // Set initial view
+
+       // Add a tile layer (replace with your tile provider)
+       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+           maxZoom: 19,
+       }).addTo(map);
+
+
+        map.on('moveend', function () {
+            const center = map.getCenter();
+            const zoom = map.getZoom();
+            const iframe = document.getElementById('windy-iframe');
+            iframe.src = `https://embed.windy.com/embed.html?type=map&zoom=${zoom}&overlay=clouds&product=ecmwf&level=surface&lat=${center.lat}&lon=${center.lng}`;
+        });
+
+        map.on('click', function(e) {
+            document.getElementById('chatbot-container').style.display = 'flex'; // Show chatbot container
+            let lat = e.latlng.lat;
+            let lng = e.latlng.lng;
+            fetchChatbotResponse(lat, lng);
+        });
+
+        function fetchChatbotResponse(latitude, longitude) {
+            fetch(/get-chatbot-response?latitude=${latitude}&longitude=${longitude})
+                .then(response => {
+                    console.log('Response Status:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Data received:', data);
+                    if (data.responses) {
+                        displayChatbotMessages(data.responses);
+                    } else {
+                        console.error('No responses received');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching chatbot response:', error);
+                });
+        }
+ 
+
+        function displayChatbotMessages(responses) {
+            let chatbot = document.getElementById('chatbot');
+            chatbot.innerHTML = ''; // Clear previous messages
+ 
+            let i = 0;
+            let messageIndex = 0;
+            
+            function typeMessage() {
+                if (i < responses[messageIndex].length) {
+                    chatbot.innerHTML += responses[messageIndex].charAt(i);
+                    i++;
+                    setTimeout(typeMessage, 50); // Delay between each character
+                } else {
+                    messageIndex++;
+                    if (messageIndex < responses.length) {
+                        i = 0; // Reset the character index for the next message
+                        setTimeout(typeMessage, 500); // Delay before showing the next message
+                    }
+                }
+            }
+ 
+            typeMessage(); // Start typing the first message
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+        App.py
+        @app.route('/get-chatbot-response', methods=['GET'])
+def get_chatbot_response():
+    latitude = request.args.get('latitude')
+    longitude = request.args.get('longitude')
+
+    if not latitude or not longitude:
+        return jsonify({"error": "Latitude and Longitude are required"}), 400
+
+    try:
+        connection = create_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        # Fetch location ID
+        cursor.execute('''SELECT location_id FROM locations
+                          WHERE latitude = CAST(%s AS DECIMAL(10, 7))
+                          AND longitude = CAST(%s AS DECIMAL(10, 7))''',
+                       (latitude, longitude))
+        locations = cursor.fetchone()
+
+        if not locations:
+            return jsonify({"error": "Location not found."}), 404
+
+        location_id = locations['location_id']
+
+        # Fetch current cloud cover data
+        cursor.execute('''SELECT * FROM current_cloud_cover
+                          WHERE location_id = %s
+                          ORDER BY time DESC LIMIT 1''', (location_id,))
+        current_data = cursor.fetchone()
+
+        if not current_data:
+            return jsonify({"error": "No current cloud cover data found."}), 404
+
+        # Prepare data for chatbot response
+        cloud_cover_total = [current_data['cloud_cover_total']]
+        cloud_cover_low = [current_data['cloud_cover_low']]
+        cloud_cover_mid = [current_data['cloud_cover_mid']]
+        cloud_cover_high = [current_data['cloud_cover_high']]
+        visibility = [current_data['visibility']]
+        timestamps = [current_data['time'].strftime('%Y-%m-%dT%H:%M')]
+
+        # Call the generate_chatbot_responses function
+        chatbot_responses = generate_chatbot_responses(
+            latitude, longitude,
+            cloud_cover_total,
+            cloud_cover_low,
+            cloud_cover_mid,
+            cloud_cover_high,
+            visibility,
+            timestamps
+        )
+
+        return jsonify({"responses": chatbot_responses})
+
+    except Error as e:
+        print(f"[ERROR] Database error: {e}")
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+    finally:
+        if 'connection' in locals() and connection.is_connected():
+            cursor.close()
+            connection.close()
+            

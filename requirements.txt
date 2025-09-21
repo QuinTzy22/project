@@ -1,0 +1,7 @@
+Flask==2.3.3
+Flask-Cors==3.0.10
+requests==2.31.0
+mysql-connector-python==8.0.33
+google-auth==2.15.0
+google-auth-oauthlib==1.0.0
+google-api-python-client==2.101.0

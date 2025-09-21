@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Cover Desktop App</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../static/style.css">
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://js.pusher.com/beams/1.0/push-notifications-cdn.js"></script>
+
+    <style>
+        .nlp-container {
+        position: relative;
+        width: 100%;
+        height: 300px;
+        overflow: hidden;
+    }
+    .placeholder-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-family: Arial, sans-serif;
+        color: #888;
+        font-size: 18px;
+        text-align: center;
+        pointer-events: none; /* Allows interaction with iframe below */
+    }
+    iframe {
+        width: 99%;
+        height: 80%;
+        border: none;
+    }
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: rgb(120, 147, 199);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Button to toggle the sidebar -->
+    <button id="sidebar-toggle-btn" aria-label="Toggle Sidebar">☰</button>
+
+           <div class="dropdown">
+            <div class="user-profile-container">
+                <!-- Notification Icon -->
+                <div class="notification-container" id="notification-container">
+                    <img src="../static/images/notification.png" alt="Notification" class="notification">
+                    <span class="badge" id="notification-badge">0</span>
+                </div> 
+            
+                <!-- User Profile -->
+               <img src="../static/images/profile-picture.png" alt="Profile Picture" class="profile-pic">
+               <span class="user-name" id="user-name">{{ f_name }}</span>
+    
+    
+            <button class="dropdown-button" style="float: right;">
+                <img src="../static/images/dropdown-icon.png" alt="Dropdown Icon" class="dropdown-icon">
+            </button>
+            <div class="dropdown-menu">
+                <a href="#" id="edit-profile-button">Edit Profile</a>
+                    <a class="view-users-btn" id="view-users-btn" onclick="location.href='/all-users'">View Users</a>
+                <a class="view-live-map" id="view-live-map" onclick="location.href='/live-map'">View Live Map</a>
+            </div>
+        </div>
+
+        </div>
+
+
+        <div class="notification-menu" id="notification-menu">
+            <h3>Notifications</h3>
+            <ul id="notification-list">
+                <!-- Notifications will be dynamically added here -->
+            </ul>
+        </div>
+        
+
+                <!-- Modal Section -->
+        <div id="edit-profile-modal" class="modal">
+            <div class="modal-content">
+                <span id="close-modal-button" class="close-button">&times;</span>
+                <h2>Edit Profile</h2>
+                <form id="edit-profile-form" method="POST" action="/edit-profile">
+                    <label for="first_name">First Name:</label>
+                    <input type="text" id="first_name" name="first_name">
+                    <br>
+                    <label for="last_name">Last Name:</label>
+                    <input type="text" id="last_name" name="last_name">
+                    <br>
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" value="{{ username }}">
+                    <br>
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" value="{{ email }}">
+                    <br>
+                    <button type="submit">Save Changes</button>
+                </form>
+            </div>
+        </div>
+
+
+    <div class="sidebar">
+        <div class="sidebar-container">
+
+            <button class="logout-btn" id="logout-btn">Logout</button>
+        </div>
+    </div>
+    
+    <!-- Leaflet Map -->
+    <div id="map"></div>
+
+    <!-- Data container for cloud cover data -->
+    <div class="data-container">
+        <div class="data-content">
+            <h3>Cloud Cover Data</h3>
+            <div>
+                <strong>Latitude:</strong> <span id="latitude">N/A</span><br>
+                <strong>Longitude:</strong> <span id="longitude">N/A</span>
+            </div>
+            <div id="cloudCoverDataTable" class="table-responsive mt-3">
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>High Cloud Cover</td>
+                            <td id="cloudCoverHigh">N/A</td>
+                        </tr>
+                        <tr>
+                            <td>Mid Cloud Cover</td>
+                            <td id="cloudCoverMid">N/A</td>
+                        </tr>
+                        <tr>
+                            <td>Low Cloud Cover</td>
+                            <td id="cloudCoverLow">N/A</td>
+                        </tr>
+                        <tr>
+                            <td>Total Cloud Cover</td>
+                            <td id="cloudCoverTotal">N/A</td>
+                        </tr>
+                        <tr>
+                            <td>Visibility</td>
+                            <td id="visibility">N/A</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+            </div>
+            <div id="chartContainer">
+                <canvas id="hourlyCloudCoverChart"></canvas>
+            </div>
+                
+            <!-- NLP Analysis Section -->
+            <div id="nlpAnalysis" class="nlp-container">
+                <div id="placeholder" class="placeholder-text" style="color: black;">Processing data...</div>
+                <iframe id="nlpIframe" src="https://barmmdrr.com/connect_ai/message?prompt="></iframe>
+            </div>
+        </div>
+    </div>
+    
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="../static/script.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
+
